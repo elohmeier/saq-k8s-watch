@@ -1,0 +1,28 @@
+[project]
+name = "saq-k8s-watch"
+version = "0.1.0"
+description = "Kubernetes events monitor for SAQ worker/job recovery"
+requires-python = ">=3.14"
+dependencies = [
+  "kubernetes-asyncio>=29.0.0",
+  "saq>=0.26.1",
+  "typing-extensions>=4.12.2",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.2.0",
+  "pytest-asyncio>=0.23.7",
+  "redis>=5.0.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[build-system]
+requires = ["uv_build>=0.9.10,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "saq_k8s_watch"
+module-root = ""
