@@ -37,4 +37,4 @@ USER nonroot
 # Use `/app` as the working directory
 WORKDIR /app
 
-CMD ["python", "/app/docker_entrypoint.py"]
+CMD ["saq-k8s-watch"]

@@ -11,6 +11,9 @@ dependencies = [
   "typing-extensions>=4.12.2",
 ]
 
+[project.scripts]
+saq-k8s-watch = "saq_k8s_watch.cli:cli"
+
 [project.optional-dependencies]
 build = ["uv ~= 0.10.0"]
 

@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
+from importlib.metadata import version
 from typing import Iterable
+from urllib.parse import urlparse, urlunparse
 
 from saq.job import Status
 from saq.queue import Queue
 
 from saq_k8s_watch import KubernetesSaqEventMonitor
+
+logger = logging.getLogger(__name__)
 
 
 def _getenv(name: str, default: str | None = None) -> str | None:
@@ -46,6 +51,16 @@ def _getenv_set(name: str, default: Iterable[str]) -> set[str]:
     return {item.strip() for item in value.split(",") if item.strip()}
 
 
+def _redact_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.username or parsed.password:
+        netloc = f"***:***@{parsed.hostname}"
+        if parsed.port:
+            netloc += f":{parsed.port}"
+        return urlunparse(parsed._replace(netloc=netloc))
+    return url
+
+
 async def main() -> None:
     queue_url = _getenv("SAQ_QUEUE_URL")
     if not queue_url:
@@ -80,17 +95,38 @@ async def main() -> None:
         ],
     )
 
+    namespace = _getenv("SAQ_NAMESPACE")
+    label_selector = _getenv("SAQ_LABEL_SELECTOR")
+    retry_on_stop = _getenv_bool("SAQ_RETRY_ON_STOP", True)
+    terminal_status = _getenv_status("SAQ_TERMINAL_STATUS", Status.FAILED)
+    event_dedupe_ttl_s = _getenv_int("SAQ_EVENT_DEDUPE_TTL_S", 600)
+    watch_timeout_s = _getenv_int("SAQ_WATCH_TIMEOUT_S", 300)
+
+    logger.info(
+        "queue=%s name=%s namespace=%s label_selector=%s",
+        _redact_url(queue_url),
+        queue_name,
+        namespace,
+        label_selector,
+    )
+    logger.info(
+        "retry_on_stop=%s terminal_status=%s stop_reasons=%s",
+        retry_on_stop,
+        terminal_status.name,
+        sorted(stop_reasons),
+    )
+
     monitor = KubernetesSaqEventMonitor(
         queue=queue,
-        namespace=_getenv("SAQ_NAMESPACE"),
-        label_selector=_getenv("SAQ_LABEL_SELECTOR"),
+        namespace=namespace,
+        label_selector=label_selector,
         worker_id_label=_getenv("SAQ_WORKER_ID_LABEL", "saq.io/worker-id"),
         worker_id_annotation=_getenv("SAQ_WORKER_ID_ANNOTATION", "saq.io/worker-id"),
         use_pod_name_as_worker_id=_getenv_bool("SAQ_USE_POD_NAME_AS_WORKER_ID", True),
-        retry_on_stop=_getenv_bool("SAQ_RETRY_ON_STOP", True),
-        terminal_status=_getenv_status("SAQ_TERMINAL_STATUS", Status.FAILED),
-        event_dedupe_ttl_s=_getenv_int("SAQ_EVENT_DEDUPE_TTL_S", 600),
-        watch_timeout_s=_getenv_int("SAQ_WATCH_TIMEOUT_S", 300),
+        retry_on_stop=retry_on_stop,
+        terminal_status=terminal_status,
+        event_dedupe_ttl_s=event_dedupe_ttl_s,
+        watch_timeout_s=watch_timeout_s,
         stop_reasons=stop_reasons,
         stop_message_substrings=stop_message_substrings,
     )
@@ -98,5 +134,14 @@ async def main() -> None:
     await monitor.run()
 
 
-if __name__ == "__main__":
+def cli() -> None:
+    log_level = _getenv("SAQ_LOG_LEVEL", "INFO") or "INFO"
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)-8s %(name)s - %(message)s",
+        level=getattr(logging, log_level.upper(), logging.INFO),
+    )
+
+    pkg_version = version("saq-k8s-watch")
+    logger.info("saq-k8s-watch %s starting", pkg_version)
+
     asyncio.run(main())
