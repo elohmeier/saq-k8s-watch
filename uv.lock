@@ -424,7 +424,7 @@ wheels = [
 
 [[package]]
 name = "saq-k8s-watch"
-version = "0.1.0"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "kubernetes-asyncio" },
