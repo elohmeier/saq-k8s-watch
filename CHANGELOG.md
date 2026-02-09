@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.4 (2026-02-09)
+
+### Bug Fixes
+
+- Pin psycopg-pool <3.3.0 for saq compatibility
+  ([`1679652`](https://github.com/elohmeier/saq-k8s-watch/commit/1679652396d585a06d5d84de9ba5aca21cb63fc1))
+
+
 ## v1.0.3 (2026-02-09)
 
 ### Bug Fixes
