@@ -10,10 +10,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = [
+build = ["uv ~= 0.10.0"]
+
+[dependency-groups]
+dev = [
   "pytest>=8.2.0",
   "pytest-asyncio>=0.23.7",
   "redis>=5.0.0",
+  "ruff>=0.15.0",
 ]
 
 [tool.pytest.ini_options]
@@ -26,3 +30,15 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-name = "saq_k8s_watch"
 module-root = ""
+
+[tool.semantic_release]
+version_toml = [
+  "pyproject.toml:project.version",
+  "helm/saq-k8s-watch/Chart.yaml:version",
+  "helm/saq-k8s-watch/Chart.yaml:appVersion",
+]
+build_command = """
+    python -m pip install -e '.[build]'
+    uv lock --upgrade-package "$PACKAGE_NAME"
+    git add uv.lock
+"""

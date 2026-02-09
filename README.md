@@ -1,5 +1,9 @@
 # saq-k8s-watch
 
+[![CI](https://github.com/elohmeier/saq-k8s-watch/actions/workflows/ci.yaml/badge.svg)](https://github.com/elohmeier/saq-k8s-watch/actions/workflows/ci.yaml)
+[![CD](https://github.com/elohmeier/saq-k8s-watch/actions/workflows/cd.yaml/badge.svg)](https://github.com/elohmeier/saq-k8s-watch/actions/workflows/cd.yaml)
+[![GHCR](https://img.shields.io/badge/ghcr.io-saq--k8s--watch-blue)](https://ghcr.io/elohmeier/saq-k8s-watch)
+
 Kubernetes events watcher that detects worker pod stops (e.g., OOMKilled) and updates SAQ job/worker state.
 
 ## Usage
@@ -26,10 +30,10 @@ If you don't set a worker-id label or annotation, the monitor falls back to usin
 
 ## Tests
 
-Install test dependencies:
+Install dev dependencies:
 
 ```bash
-uv pip install -e ".[test]"
+uv sync --dev
 ```
 
 Run the test suite (requires access to a local Kubernetes cluster):
