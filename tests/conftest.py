@@ -83,8 +83,7 @@ def oom_worker_image() -> str:
     )
     if result.returncode != 0:
         raise RuntimeError(
-            "Failed to build OOM test image:\n"
-            f"{result.stdout}\n{result.stderr}"
+            f"Failed to build OOM test image:\n{result.stdout}\n{result.stderr}"
         )
 
     return tag

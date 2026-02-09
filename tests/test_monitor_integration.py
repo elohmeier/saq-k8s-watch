@@ -100,9 +100,7 @@ async def test_monitor_handles_stop_event(
         assert job.error is not None and "OOMKilled" in job.error
     finally:
         try:
-            await core_v1.delete_namespaced_pod(
-                name=pod_name, namespace=kube_namespace
-            )
+            await core_v1.delete_namespaced_pod(name=pod_name, namespace=kube_namespace)
         except Exception:
             pass
         await asyncio.sleep(0.1)

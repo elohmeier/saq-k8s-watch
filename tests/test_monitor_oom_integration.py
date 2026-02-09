@@ -38,7 +38,9 @@ async def _wait_for_pod_ready(
 ) -> str:
     deadline = asyncio.get_running_loop().time() + timeout_s
     while asyncio.get_running_loop().time() < deadline:
-        pods = await core_v1.list_namespaced_pod(namespace, label_selector=label_selector)
+        pods = await core_v1.list_namespaced_pod(
+            namespace, label_selector=label_selector
+        )
         for pod in pods.items:
             if pod.status and pod.status.phase == "Running":
                 statuses = pod.status.container_statuses or []
@@ -53,7 +55,9 @@ async def _wait_for_deployment_ready(
 ) -> None:
     deadline = asyncio.get_running_loop().time() + timeout_s
     while asyncio.get_running_loop().time() < deadline:
-        deployment = await apps_v1.read_namespaced_deployment(name=name, namespace=namespace)
+        deployment = await apps_v1.read_namespaced_deployment(
+            name=name, namespace=namespace
+        )
         status = deployment.status
         if status and status.ready_replicas and status.ready_replicas >= 1:
             return
@@ -104,8 +108,12 @@ async def test_monitor_detects_oom_and_updates_job(
     apps_v1 = client.AppsV1Api(kube_client)
     pod_name = ""
     try:
-        await apps_v1.create_namespaced_deployment(namespace=kube_namespace, body=redis_deploy)
-        await core_v1.create_namespaced_service(namespace=kube_namespace, body=redis_service)
+        await apps_v1.create_namespaced_deployment(
+            namespace=kube_namespace, body=redis_deploy
+        )
+        await core_v1.create_namespaced_service(
+            namespace=kube_namespace, body=redis_service
+        )
         await _wait_for_deployment_ready(apps_v1, kube_namespace, "saq-redis")
 
         worker_labels = {"app": "saq-worker"}
@@ -155,7 +163,9 @@ async def test_monitor_detects_oom_and_updates_job(
                     client.V1EnvVar(
                         name="SAQ_WORKER_ID",
                         value_from=client.V1EnvVarSource(
-                            field_ref=client.V1ObjectFieldSelector(field_path="metadata.name")
+                            field_ref=client.V1ObjectFieldSelector(
+                                field_path="metadata.name"
+                            )
                         ),
                     ),
                 ],
@@ -215,7 +225,9 @@ async def test_monitor_detects_oom_and_updates_job(
                     break
                 await asyncio.sleep(2)
             else:
-                raise AssertionError("Timed out waiting for job to reach terminal state")
+                raise AssertionError(
+                    "Timed out waiting for job to reach terminal state"
+                )
         finally:
             monitor_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -225,9 +237,13 @@ async def test_monitor_detects_oom_and_updates_job(
         # Best-effort cleanup.
         with contextlib.suppress(Exception):
             if pod_name:
-                await core_v1.delete_namespaced_pod(name=pod_name, namespace=kube_namespace)
+                await core_v1.delete_namespaced_pod(
+                    name=pod_name, namespace=kube_namespace
+                )
         with contextlib.suppress(Exception):
-            await apps_v1.delete_namespaced_deployment(name="saq-redis", namespace=kube_namespace)
+            await apps_v1.delete_namespaced_deployment(
+                name="saq-redis", namespace=kube_namespace
+            )
         with contextlib.suppress(Exception):
             await core_v1.delete_namespaced_service(
                 name=redis_service_name, namespace=kube_namespace

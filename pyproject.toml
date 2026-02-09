@@ -32,12 +32,11 @@ module-name = "saq_k8s_watch"
 module-root = ""
 
 [tool.semantic_release]
-version_toml = [
-  "pyproject.toml:project.version",
-  "helm/saq-k8s-watch/Chart.yaml:version",
-  "helm/saq-k8s-watch/Chart.yaml:appVersion",
-]
+version_toml = ["pyproject.toml:project.version"]
 build_command = """
+    sed -i "s/^version:.*/version: $NEW_VERSION/" helm/saq-k8s-watch/Chart.yaml
+    sed -i "s/^appVersion:.*/appVersion: \\"$NEW_VERSION\\"/" helm/saq-k8s-watch/Chart.yaml
+    git add helm/saq-k8s-watch/Chart.yaml
     python -m pip install -e '.[build]'
     uv lock --upgrade-package "$PACKAGE_NAME"
     git add uv.lock
