@@ -479,7 +479,7 @@ postgres = [
 
 [[package]]
 name = "saq-k8s-watch"
-version = "1.0.2"
+version = "1.0.3"
 source = { editable = "." }
 dependencies = [
     { name = "kubernetes-asyncio" },

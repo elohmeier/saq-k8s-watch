@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.3 (2026-02-09)
+
+### Bug Fixes
+
+- Add psycopg-binary to avoid libpq system dependency
+  ([`a2d4633`](https://github.com/elohmeier/saq-k8s-watch/commit/a2d4633ad451048de16bacaa8cb6cc62191d43df))
+
+
 ## v1.0.2 (2026-02-09)
 
 ### Bug Fixes
