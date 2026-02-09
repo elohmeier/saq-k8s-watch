@@ -5,7 +5,7 @@ description = "Kubernetes events monitor for SAQ worker/job recovery"
 requires-python = ">=3.14"
 dependencies = [
   "kubernetes-asyncio>=29.0.0",
-  "saq>=0.26.1",
+  "saq[postgres]>=0.26.1",
   "typing-extensions>=4.12.2",
 ]
 
