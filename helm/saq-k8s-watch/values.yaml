@@ -1,0 +1,28 @@
+replicaCount: 1
+
+image:
+  repository: saq-k8s-watch
+  tag: latest
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ""
+
+rbac:
+  create: true
+
+env:
+  queueUrl: ""
+  queueName: "default"
+  namespace: ""
+  labelSelector: ""
+  workerIdLabel: "saq.io/worker-id"
+  workerIdAnnotation: "saq.io/worker-id"
+  usePodNameAsWorkerId: true
+  retryOnStop: true
+  terminalStatus: "FAILED"
+  eventDedupeTtlSeconds: 600
+  watchTimeoutSeconds: 300
+  stopReasons: ""
+  stopMessageSubstrings: ""

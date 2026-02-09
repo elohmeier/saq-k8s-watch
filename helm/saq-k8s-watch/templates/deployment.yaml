@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "saq-k8s-watch.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "saq-k8s-watch.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "saq-k8s-watch.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "saq-k8s-watch.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ include "saq-k8s-watch.serviceAccountName" . }}
+      containers:
+        - name: saq-k8s-watch
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: SAQ_QUEUE_URL
+              value: {{ required "env.queueUrl is required" .Values.env.queueUrl | quote }}
+            - name: SAQ_QUEUE_NAME
+              value: {{ .Values.env.queueName | quote }}
+            - name: SAQ_NAMESPACE
+              value: {{ .Values.env.namespace | quote }}
+            - name: SAQ_LABEL_SELECTOR
+              value: {{ .Values.env.labelSelector | quote }}
+            - name: SAQ_WORKER_ID_LABEL
+              value: {{ .Values.env.workerIdLabel | quote }}
+            - name: SAQ_WORKER_ID_ANNOTATION
+              value: {{ .Values.env.workerIdAnnotation | quote }}
+            - name: SAQ_USE_POD_NAME_AS_WORKER_ID
+              value: {{ .Values.env.usePodNameAsWorkerId | quote }}
+            - name: SAQ_RETRY_ON_STOP
+              value: {{ .Values.env.retryOnStop | quote }}
+            - name: SAQ_TERMINAL_STATUS
+              value: {{ .Values.env.terminalStatus | quote }}
+            - name: SAQ_EVENT_DEDUPE_TTL_S
+              value: {{ .Values.env.eventDedupeTtlSeconds | quote }}
+            - name: SAQ_WATCH_TIMEOUT_S
+              value: {{ .Values.env.watchTimeoutSeconds | quote }}
+            - name: SAQ_STOP_REASONS
+              value: {{ .Values.env.stopReasons | quote }}
+            - name: SAQ_STOP_MESSAGE_SUBSTRINGS
+              value: {{ .Values.env.stopMessageSubstrings | quote }}
