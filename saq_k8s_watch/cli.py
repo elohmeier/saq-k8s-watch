@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import logging
 import os
 from importlib.metadata import version
@@ -67,7 +68,15 @@ async def main() -> None:
         raise SystemExit("SAQ_QUEUE_URL is required")
 
     queue_name = _getenv("SAQ_QUEUE_NAME", "default") or "default"
-    queue = Queue.from_url(queue_url, name=queue_name)
+    queue_class_path = _getenv("SAQ_QUEUE_CLASS")
+    if queue_class_path:
+        module_path, class_name = queue_class_path.rsplit(".", 1)
+        mod = importlib.import_module(module_path)
+        queue_cls = getattr(mod, class_name)
+        queue = queue_cls.from_url(queue_url, name=queue_name)
+        logger.info("Using custom queue class: %s", queue_class_path)
+    else:
+        queue = Queue.from_url(queue_url, name=queue_name)
 
     stop_reasons = _getenv_set(
         "SAQ_STOP_REASONS",
@@ -134,12 +143,38 @@ async def main() -> None:
     await monitor.run()
 
 
+class _ExceptionReprFilter(logging.Filter):
+    """Use repr() for exception args in log records.
+
+    psycopg_pool logs connection errors as ``"error connecting in %r: %s"``
+    where ``%s`` calls ``str(ex)``.  Some exceptions produce an empty string,
+    yielding truncated lines like ``error connecting in 'pool-1': ``.
+    ``repr()`` always includes the class name and constructor args.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.args:
+            args = record.args
+            if isinstance(args, dict):
+                record.args = {
+                    k: repr(v) if isinstance(v, BaseException) else v
+                    for k, v in args.items()
+                }
+            elif isinstance(args, tuple):
+                record.args = tuple(
+                    repr(a) if isinstance(a, BaseException) else a for a in args
+                )
+        return True
+
+
 def cli() -> None:
     log_level = _getenv("SAQ_LOG_LEVEL", "INFO") or "INFO"
     logging.basicConfig(
         format="%(asctime)s %(levelname)-8s %(name)s - %(message)s",
         level=getattr(logging, log_level.upper(), logging.INFO),
     )
+
+    logging.getLogger("psycopg.pool").addFilter(_ExceptionReprFilter())
 
     pkg_version = version("saq-k8s-watch")
     logger.info("saq-k8s-watch %s starting", pkg_version)

@@ -116,7 +116,14 @@ class KubernetesSaqEventMonitor:
     _resource_version: str | None = field(default=None, init=False)
 
     async def run(self) -> None:
-        await self.queue.connect()
+        logger.info("Connecting to queue")
+        try:
+            await self.queue.connect()
+        except Exception:
+            logger.exception("Failed to connect to queue")
+            raise
+        logger.info("Connected to queue")
+
         await self._ensure_client()
 
         backoff = self.backoff_base_s
