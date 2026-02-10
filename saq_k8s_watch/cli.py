@@ -12,6 +12,7 @@ from saq.job import Status
 from saq.queue import Queue
 
 from saq_k8s_watch import KubernetesSaqEventMonitor
+from saq_k8s_watch.server import start_server
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +141,11 @@ async def main() -> None:
         stop_message_substrings=stop_message_substrings,
     )
 
-    await monitor.run()
+    runner = await start_server()
+    try:
+        await monitor.run()
+    finally:
+        await runner.cleanup()
 
 
 class _ExceptionReprFilter(logging.Filter):
