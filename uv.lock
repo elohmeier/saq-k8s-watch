@@ -479,7 +479,7 @@ postgres = [
 
 [[package]]
 name = "saq-k8s-watch"
-version = "1.0.4"
+version = "1.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "kubernetes-asyncio" },
@@ -506,7 +506,7 @@ dev = [
 requires-dist = [
     { name = "kubernetes-asyncio", specifier = ">=29.0.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.0" },
-    { name = "psycopg-pool", specifier = ">=3.2.0,<3.3.0" },
+    { name = "psycopg-pool", specifier = ">=3.2.0" },
     { name = "saq", extras = ["postgres"], specifier = ">=0.26.1" },
     { name = "typing-extensions", specifier = ">=4.12.2" },
     { name = "uv", marker = "extra == 'build'", specifier = "~=0.10.0" },

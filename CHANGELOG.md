@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.1.0 (2026-02-10)
+
+### Features
+
+- Support custom queue class, improve logging and error handling
+  ([`6843211`](https://github.com/elohmeier/saq-k8s-watch/commit/6843211c98af17bc059bdec4947315a3d5887fef))
+
+### Refactoring
+
+- Convert entrypoint to pyproject script with structured logging
+  ([`213d386`](https://github.com/elohmeier/saq-k8s-watch/commit/213d38645b63b74bad9329230b5c50d48097a271))
+
+
 ## v1.0.4 (2026-02-09)
 
 ### Bug Fixes
