@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import subprocess
@@ -51,11 +52,8 @@ async def kube_namespace(kube_client: client.ApiClient) -> str:
     try:
         yield name
     finally:
-        try:
+        with contextlib.suppress(Exception):
             await core_v1.delete_namespace(name=name)
-        except Exception:
-            # Best-effort cleanup.
-            pass
 
 
 @pytest.fixture(scope="session")

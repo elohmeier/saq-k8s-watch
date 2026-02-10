@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from dataclasses import dataclass
 
 import pytest
 from kubernetes_asyncio import client
-
 from saq.job import Status
 from saq_k8s_watch.monitor import EventDeduper, KubernetesSaqEventMonitor
 
@@ -97,10 +97,9 @@ async def test_monitor_handles_stop_event(
 
         assert job.retry_called is True
         assert job.finish_called is False
-        assert job.error is not None and "OOMKilled" in job.error
+        assert job.error is not None
+        assert "OOMKilled" in job.error
     finally:
-        try:
+        with contextlib.suppress(Exception):
             await core_v1.delete_namespaced_pod(name=pod_name, namespace=kube_namespace)
-        except Exception:
-            pass
         await asyncio.sleep(0.1)

@@ -4,8 +4,8 @@ import asyncio
 import importlib
 import logging
 import os
+from collections.abc import Iterable
 from importlib.metadata import version
-from typing import Iterable
 from urllib.parse import urlparse, urlunparse
 
 from saq.job import Status
@@ -66,7 +66,8 @@ def _redact_url(url: str) -> str:
 async def main() -> None:
     queue_url = _getenv("SAQ_QUEUE_URL")
     if not queue_url:
-        raise SystemExit("SAQ_QUEUE_URL is required")
+        message = "SAQ_QUEUE_URL is required"
+        raise SystemExit(message)
 
     queue_name = _getenv("SAQ_QUEUE_NAME", "default") or "default"
     queue_class_path = _getenv("SAQ_QUEUE_CLASS")

@@ -6,7 +6,6 @@ import shutil
 
 import pytest
 from kubernetes_asyncio import client
-
 from saq.job import Status
 from saq.queue import Queue
 from saq_k8s_watch.monitor import KubernetesSaqEventMonitor
@@ -22,12 +21,13 @@ async def _wait_for_tcp(host: str, port: int, timeout_s: int = 10) -> None:
     deadline = asyncio.get_running_loop().time() + timeout_s
     while asyncio.get_running_loop().time() < deadline:
         try:
-            reader, writer = await asyncio.open_connection(host, port)
+            _, writer = await asyncio.open_connection(host, port)
             writer.close()
             await writer.wait_closed()
-            return
         except OSError:
             await asyncio.sleep(0.5)
+        else:
+            return
     raise RuntimeError(f"Timed out waiting for TCP {host}:{port}")
 
 
@@ -219,7 +219,8 @@ async def test_monitor_detects_oom_and_updates_job(
             while asyncio.get_running_loop().time() < deadline:
                 current = await queue.job(job.key)
                 if current and current.status in (Status.FAILED, Status.ABORTED):
-                    assert current.error and "OOM" in current.error.upper()
+                    assert current.error
+                    assert "OOM" in current.error.upper()
                     break
                 await asyncio.sleep(2)
             else:
