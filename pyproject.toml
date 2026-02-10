@@ -1,6 +1,6 @@
 [project]
 name = "saq-k8s-watch"
-version = "1.1.0"
+version = "1.2.0"
 description = "Kubernetes events monitor for SAQ worker/job recovery"
 requires-python = ">=3.14"
 dependencies = [

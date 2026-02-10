@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.0 (2026-02-10)
+
+### Features
+
+- Enable metrics / livez endpoint
+  ([`24aa5b5`](https://github.com/elohmeier/saq-k8s-watch/commit/24aa5b558e7a2600e3897ed78fce79344302b64f))
+
+
 ## v1.1.0 (2026-02-10)
 
 ### Features
