@@ -13,7 +13,6 @@ import pytest
 from saq.job import Status
 from saq_k8s_watch.monitor import EventDeduper, KubernetesSaqEventMonitor
 
-
 # ---------------------------------------------------------------------------
 # Fakes
 # ---------------------------------------------------------------------------
