@@ -114,6 +114,8 @@ class KubernetesSaqEventMonitor:
     _core_v1: K8sCoreV1Api | None = field(default=None, init=False)
     _deduper: EventDeduper = field(default_factory=EventDeduper, init=False)
     _resource_version: str | None = field(default=None, init=False)
+    _watched_pods: set[str] = field(default_factory=set, init=False)
+    _watched_pods_refreshed_at: float = field(default=0.0, init=False)
 
     async def run(self) -> None:
         logger.info("Connecting to queue")
@@ -162,14 +164,66 @@ class KubernetesSaqEventMonitor:
             return
         await _maybe_await(k8s_config.load_kube_config())
 
+    async def _refresh_watched_pods(self) -> None:
+        """List pods matching ``label_selector`` and cache their names.
+
+        The label_selector cannot be passed to the Events API because Event
+        objects do not carry pod labels.  Instead we periodically list the
+        matching Pods and filter events by pod name.
+        """
+        if not self.label_selector or self._core_v1 is None:
+            return
+        try:
+            if self.namespace:
+                result = await self._core_v1.list_namespaced_pod(
+                    self.namespace,
+                    label_selector=self.label_selector,
+                )
+            else:
+                result = await self._core_v1.list_pod_for_all_namespaces(
+                    label_selector=self.label_selector,
+                )
+            self._watched_pods = {
+                pod.metadata.name
+                for pod in (result.items or [])
+                if pod.metadata and pod.metadata.name
+            }
+            self._watched_pods_refreshed_at = time.monotonic()
+            logger.debug("Refreshed watched pods: %s", self._watched_pods)
+        except Exception:
+            logger.exception("Failed to refresh watched pods")
+
+    async def _is_watched_pod(self, pod_name: str) -> bool:
+        """Check whether *pod_name* belongs to a watched pod.
+
+        Returns ``True`` immediately when no ``label_selector`` is configured
+        or when the pod is already in the cache.  On a cache miss, refreshes
+        the cache at most once every 15 s so that newly-scaled pods are picked
+        up without hammering the API on events from non-watched pods.
+        """
+        if not self.label_selector:
+            return True
+        if pod_name in self._watched_pods:
+            return True
+        now = time.monotonic()
+        if now - self._watched_pods_refreshed_at < 15:
+            return False
+        await self._refresh_watched_pods()
+        return pod_name in self._watched_pods
+
     async def _watch_events(self) -> None:
         assert self._core_v1 is not None
         watcher = K8sWatch()
 
+        await self._refresh_watched_pods()
+
+        # NOTE: label_selector is intentionally NOT passed to the Events API.
+        # Kubernetes Event objects do not carry the labels of the involved Pod,
+        # so filtering by label_selector here would silently drop all events.
+        # Pod filtering is handled in _handle_event via _is_watched_pod.
         stream_kwargs: dict[str, t.Any] = {
             "timeout_seconds": self.watch_timeout_s,
             "field_selector": self.field_selector,
-            "label_selector": self.label_selector,
             "resource_version": self._resource_version,
         }
 
@@ -198,6 +252,9 @@ class KubernetesSaqEventMonitor:
 
         pod_name, pod_namespace = self._pod_ref(event)
         if not pod_name:
+            return
+
+        if not await self._is_watched_pod(pod_name):
             return
 
         pod = await self._fetch_pod(pod_name, pod_namespace)
