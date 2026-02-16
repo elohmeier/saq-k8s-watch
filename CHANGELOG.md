@@ -2,6 +2,32 @@
 
 <!-- version list -->
 
+## v1.3.0 (2026-02-16)
+
+### Bug Fixes
+
+- Filter events by pod name instead of passing label_selector to Events API
+  ([`979b200`](https://github.com/elohmeier/saq-k8s-watch/commit/979b200c62c45f3f5fb31bc9d8f4d1cfdf258767))
+
+- Use targeted pod check on rate-limited cache miss to prevent event loss
+  ([`3188d06`](https://github.com/elohmeier/saq-k8s-watch/commit/3188d06834e3e547d47a20ddf4013ac0de8acd9a))
+
+### Chores
+
+- Ruff fixes
+  ([`db3f252`](https://github.com/elohmeier/saq-k8s-watch/commit/db3f252ea0069c754a183e4ac78fc1abd3928c2e))
+
+### Code Style
+
+- Fix import block formatting
+  ([`68fd9db`](https://github.com/elohmeier/saq-k8s-watch/commit/68fd9db50474569b624063e82338cb86b7a3dc9c))
+
+### Features
+
+- Handle DB_* env var configuration
+  ([`54da55f`](https://github.com/elohmeier/saq-k8s-watch/commit/54da55f4da15906b5eabfd546c48a619e483f151))
+
+
 ## v1.2.0 (2026-02-10)
 
 ### Features
