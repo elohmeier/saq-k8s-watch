@@ -66,8 +66,18 @@ def _redact_url(url: str) -> str:
 async def main() -> None:
     queue_url = _getenv("SAQ_QUEUE_URL")
     if not queue_url:
-        message = "SAQ_QUEUE_URL is required"
-        raise SystemExit(message)
+        db_host = _getenv("DB_HOST", "localhost")
+        db_port = _getenv("DB_PORT", "5432")
+        db_user = _getenv("DB_USER")
+        db_password = _getenv("DB_PASSWORD")
+        db_name = _getenv("DB_NAME")
+        if db_user and db_password:
+            queue_url = (
+                f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+            )
+        else:
+            message = "SAQ_QUEUE_URL or DB_USER + DB_PASSWORD + DB_NAME is required"
+            raise SystemExit(message)
 
     queue_name = _getenv("SAQ_QUEUE_NAME", "default") or "default"
     queue_class_path = _getenv("SAQ_QUEUE_CLASS")
