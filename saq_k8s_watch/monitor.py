@@ -115,6 +115,7 @@ class KubernetesSaqEventMonitor:
     _deduper: EventDeduper = field(default_factory=EventDeduper, init=False)
     _resource_version: str | None = field(default=None, init=False)
     _watched_pods: set[str] = field(default_factory=set, init=False)
+    _unwatched_pods: set[str] = field(default_factory=set, init=False)
     _watched_pods_refreshed_at: float = field(default=0.0, init=False)
 
     async def run(self) -> None:
@@ -188,28 +189,49 @@ class KubernetesSaqEventMonitor:
                 for pod in (result.items or [])
                 if pod.metadata and pod.metadata.name
             }
+            self._unwatched_pods = set()
             self._watched_pods_refreshed_at = time.monotonic()
             logger.debug("Refreshed watched pods: %s", self._watched_pods)
         except Exception:
             logger.exception("Failed to refresh watched pods")
 
-    async def _is_watched_pod(self, pod_name: str) -> bool:
+    async def _is_watched_pod(
+        self, pod_name: str, pod_namespace: str | None = None
+    ) -> bool:
         """Check whether *pod_name* belongs to a watched pod.
 
         Returns ``True`` immediately when no ``label_selector`` is configured
         or when the pod is already in the cache.  On a cache miss, refreshes
-        the cache at most once every 15 s so that newly-scaled pods are picked
-        up without hammering the API on events from non-watched pods.
+        the full cache at most once every 15 s.  If rate-limited, falls back
+        to a targeted ``list_namespaced_pod`` with both ``label_selector`` and
+        ``field_selector`` so that newly-created pods are never silently
+        dropped.
         """
         if not self.label_selector:
             return True
         if pod_name in self._watched_pods:
             return True
-        now = time.monotonic()
-        if now - self._watched_pods_refreshed_at < 15:
+        if pod_name in self._unwatched_pods:
             return False
-        await self._refresh_watched_pods()
-        return pod_name in self._watched_pods
+        now = time.monotonic()
+        if now - self._watched_pods_refreshed_at >= 15:
+            await self._refresh_watched_pods()
+            return pod_name in self._watched_pods
+        # Rate-limited: targeted single-pod check instead of dropping the event.
+        if pod_namespace and self._core_v1 is not None:
+            try:
+                result = await self._core_v1.list_namespaced_pod(
+                    pod_namespace,
+                    label_selector=self.label_selector,
+                    field_selector=f"metadata.name={pod_name}",
+                )
+                if result.items:
+                    self._watched_pods.add(pod_name)
+                    return True
+                self._unwatched_pods.add(pod_name)
+            except Exception:
+                logger.debug("Targeted pod check failed for %s", pod_name)
+        return False
 
     async def _watch_events(self) -> None:
         assert self._core_v1 is not None
@@ -254,7 +276,7 @@ class KubernetesSaqEventMonitor:
         if not pod_name:
             return
 
-        if not await self._is_watched_pod(pod_name):
+        if not await self._is_watched_pod(pod_name, pod_namespace):
             return
 
         pod = await self._fetch_pod(pod_name, pod_namespace)
