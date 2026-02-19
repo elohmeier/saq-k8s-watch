@@ -457,9 +457,21 @@ class KubernetesSaqEventMonitor:
         recovered = 0
 
         for queue in self.queues:
+            queue_name = getattr(queue, "name", "?")
             async for job in queue.iter_jobs(list(self.job_statuses)):
                 worker_id = job.worker_id
+
+                # Grace period: skip jobs that started recently
+                started = getattr(job, "started", 0) or 0
+                if started > 0 and (now_ms - started) < min_age_ms:
+                    continue
+
                 if not worker_id:
+                    # Job was claimed but the worker died before persisting
+                    # its worker_id (race between dequeue and process).
+                    error = f"orphan sweep: job has no worker_id (queue={queue_name})"
+                    await self._update_job_for_stop(job, error)
+                    recovered += 1
                     continue
 
                 # If the worker is in the watched pods set, it's still running
@@ -469,14 +481,9 @@ class KubernetesSaqEventMonitor:
                     # Without label_selector we can't determine running pods
                     continue
 
-                # Grace period: skip jobs that started recently
-                started = getattr(job, "started", 0) or 0
-                if started > 0 and (now_ms - started) < min_age_ms:
-                    continue
-
                 error = (
                     f"orphan sweep: worker {worker_id} not found in running pods"
-                    f" (queue={getattr(queue, 'name', '?')})"
+                    f" (queue={queue_name})"
                 )
                 await self._update_job_for_stop(job, error)
                 recovered += 1

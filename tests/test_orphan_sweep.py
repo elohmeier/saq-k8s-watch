@@ -12,7 +12,7 @@ from saq_k8s_watch.monitor import KubernetesSaqEventMonitor
 
 @dataclass(slots=True)
 class FakeJob:
-    worker_id: str
+    worker_id: str | None = None
     started: float = 0.0
     retryable: bool = True
     retry_called: bool = False
@@ -172,3 +172,67 @@ async def test_orphan_sweep_uses_finish_when_not_retryable() -> None:
     assert job.retry_called is False
     assert job.finish_called is True
     assert job.finish_status == Status.FAILED
+
+
+@pytest.mark.asyncio
+async def test_orphan_sweep_recovers_jobs_without_worker_id() -> None:
+    """Jobs with no worker_id past the grace period should be recovered."""
+    job = FakeJob(worker_id=None, started=_old_started_ms())
+    queue = FakeQueue(jobs=[job])
+    monitor = KubernetesSaqEventMonitor(
+        queues=[queue],
+        namespace="default",
+        label_selector="app in (saq-extraction)",
+        orphan_sweep_min_age_s=300.0,
+    )
+    monitor._watched_pods = {"alive-worker-1"}
+    monitor._watched_pods_refreshed_at = time.monotonic()
+
+    await monitor._orphan_sweep()
+
+    assert job.retry_called is True
+    assert job.error is not None
+    assert "no worker_id" in job.error
+
+
+@pytest.mark.asyncio
+async def test_orphan_sweep_respects_grace_period_for_missing_worker_id() -> None:
+    """Jobs with no worker_id within the grace period should not be touched."""
+    job = FakeJob(worker_id=None, started=_recent_started_ms())
+    queue = FakeQueue(jobs=[job])
+    monitor = KubernetesSaqEventMonitor(
+        queues=[queue],
+        namespace="default",
+        label_selector="app in (saq-extraction)",
+        orphan_sweep_min_age_s=300.0,
+    )
+    monitor._watched_pods = {"alive-worker-1"}
+    monitor._watched_pods_refreshed_at = time.monotonic()
+
+    await monitor._orphan_sweep()
+
+    assert job.retry_called is False
+    assert job.finish_called is False
+
+
+@pytest.mark.asyncio
+async def test_orphan_sweep_finishes_non_retryable_job_without_worker_id() -> None:
+    """Non-retryable jobs with no worker_id should be finished, not retried."""
+    job = FakeJob(worker_id=None, started=_old_started_ms(), retryable=False)
+    queue = FakeQueue(jobs=[job])
+    monitor = KubernetesSaqEventMonitor(
+        queues=[queue],
+        namespace="default",
+        label_selector="app in (saq-extraction)",
+        orphan_sweep_min_age_s=300.0,
+        retry_on_stop=True,
+    )
+    monitor._watched_pods = {"alive-worker-1"}
+    monitor._watched_pods_refreshed_at = time.monotonic()
+
+    await monitor._orphan_sweep()
+
+    assert job.retry_called is False
+    assert job.finish_called is True
+    assert job.finish_status == Status.FAILED
+    assert "no worker_id" in (job.error or "")
