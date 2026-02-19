@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.4.1 (2026-02-19)
+
+### Bug Fixes
+
+- Recover orphaned jobs with missing worker_id in orphan sweep
+  ([`8878594`](https://github.com/elohmeier/saq-k8s-watch/commit/88785946fdf62931cfb2af5a9ad3baf362d78baa))
+
+### Chores
+
+- Format readme
+  ([`5d76b8b`](https://github.com/elohmeier/saq-k8s-watch/commit/5d76b8bdd5e8af6caca3743686c914478d4e55dd))
+
+
 ## v1.4.0 (2026-02-19)
 
 ### Features
