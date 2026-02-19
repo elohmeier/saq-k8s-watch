@@ -44,11 +44,11 @@ A periodic background sweep detects active jobs whose `worker_id` no longer
 matches any running pod. This catches jobs that slip through the event-based
 detection (e.g., monitor restart, missed events). Configure via:
 
-| Environment Variable | Default | Description |
-|---|---|---|
-| `SAQ_QUEUE_NAMES` | `default` | Comma-separated queue names to monitor |
-| `SAQ_ORPHAN_SWEEP_INTERVAL_S` | `60` | Seconds between sweep runs |
-| `SAQ_ORPHAN_SWEEP_MIN_AGE_S` | `300` | Minimum job age (seconds) before considering it orphaned |
+| Environment Variable          | Default   | Description                                              |
+| ----------------------------- | --------- | -------------------------------------------------------- |
+| `SAQ_QUEUE_NAMES`             | `default` | Comma-separated queue names to monitor                   |
+| `SAQ_ORPHAN_SWEEP_INTERVAL_S` | `60`      | Seconds between sweep runs                               |
+| `SAQ_ORPHAN_SWEEP_MIN_AGE_S`  | `300`     | Minimum job age (seconds) before considering it orphaned |
 
 ## Tests
 
