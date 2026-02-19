@@ -73,7 +73,7 @@ async def test_monitor_handles_stop_event(
         job = FakeJob(worker_id=worker_id, retryable=True)
         queue = FakeQueue(jobs=[job])
         monitor = KubernetesSaqEventMonitor(
-            queue=queue,
+            queues=[queue],
             namespace=kube_namespace,
         )
         monitor._api_client = kube_client

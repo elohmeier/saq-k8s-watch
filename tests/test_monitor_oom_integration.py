@@ -132,7 +132,7 @@ async def test_monitor_detects_oom_and_updates_job(
         await queue.connect()
 
         monitor = KubernetesSaqEventMonitor(
-            queue=queue,
+            queues=[queue],
             namespace=kube_namespace,
             label_selector="app=saq-worker",
             use_pod_name_as_worker_id=True,

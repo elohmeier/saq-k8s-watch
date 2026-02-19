@@ -46,6 +46,13 @@ def _getenv_status(name: str, default: Status) -> Status:
     return Status[value.upper()]
 
 
+def _getenv_float(name: str, default: float) -> float:
+    value = _getenv(name)
+    if value is None:
+        return default
+    return float(value)
+
+
 def _getenv_set(name: str, default: Iterable[str]) -> set[str]:
     value = _getenv(name)
     if value is None:
@@ -79,16 +86,37 @@ async def main() -> None:
             message = "SAQ_QUEUE_URL or DB_USER + DB_PASSWORD + DB_NAME is required"
             raise SystemExit(message)
 
-    queue_name = _getenv("SAQ_QUEUE_NAME", "default") or "default"
+    queue_names_raw = (
+        _getenv("SAQ_QUEUE_NAMES") or _getenv("SAQ_QUEUE_NAME", "default") or "default"
+    )
+    queue_names = [n.strip() for n in queue_names_raw.split(",") if n.strip()]
+
     queue_class_path = _getenv("SAQ_QUEUE_CLASS")
     if queue_class_path:
         module_path, class_name = queue_class_path.rsplit(".", 1)
         mod = importlib.import_module(module_path)
         queue_cls = getattr(mod, class_name)
-        queue = queue_cls.from_url(queue_url, name=queue_name)
         logger.info("Using custom queue class: %s", queue_class_path)
     else:
-        queue = Queue.from_url(queue_url, name=queue_name)
+        queue_cls = None
+
+    from psycopg_pool import AsyncConnectionPool
+
+    pool = AsyncConnectionPool(
+        queue_url,
+        check=AsyncConnectionPool.check_connection,
+        open=False,
+        kwargs={"autocommit": True},
+    )
+    await pool.open()
+
+    queues: list[Queue] = []
+    for name in queue_names:
+        if queue_cls is not None:
+            q = queue_cls(pool=pool, name=name)
+        else:
+            q = Queue(pool=pool, name=name)  # type: ignore[call-arg]
+        queues.append(q)
 
     stop_reasons = _getenv_set(
         "SAQ_STOP_REASONS",
@@ -123,10 +151,13 @@ async def main() -> None:
     event_dedupe_ttl_s = _getenv_int("SAQ_EVENT_DEDUPE_TTL_S", 600)
     watch_timeout_s = _getenv_int("SAQ_WATCH_TIMEOUT_S", 300)
 
+    orphan_sweep_interval_s = _getenv_float("SAQ_ORPHAN_SWEEP_INTERVAL_S", 60.0)
+    orphan_sweep_min_age_s = _getenv_float("SAQ_ORPHAN_SWEEP_MIN_AGE_S", 300.0)
+
     logger.info(
-        "queue=%s name=%s namespace=%s label_selector=%s",
+        "queue=%s queues=%s namespace=%s label_selector=%s",
         _redact_url(queue_url),
-        queue_name,
+        queue_names,
         namespace,
         label_selector,
     )
@@ -136,9 +167,14 @@ async def main() -> None:
         terminal_status.name,
         sorted(stop_reasons),
     )
+    logger.info(
+        "orphan_sweep_interval_s=%s orphan_sweep_min_age_s=%s",
+        orphan_sweep_interval_s,
+        orphan_sweep_min_age_s,
+    )
 
     monitor = KubernetesSaqEventMonitor(
-        queue=queue,
+        queues=queues,
         namespace=namespace,
         label_selector=label_selector,
         worker_id_label=_getenv("SAQ_WORKER_ID_LABEL", "saq.io/worker-id"),
@@ -150,6 +186,8 @@ async def main() -> None:
         watch_timeout_s=watch_timeout_s,
         stop_reasons=stop_reasons,
         stop_message_substrings=stop_message_substrings,
+        orphan_sweep_interval_s=orphan_sweep_interval_s,
+        orphan_sweep_min_age_s=orphan_sweep_min_age_s,
     )
 
     runner = await start_server()
@@ -157,6 +195,7 @@ async def main() -> None:
         await monitor.run()
     finally:
         await runner.cleanup()
+        await pool.close()
 
 
 class _ExceptionReprFilter(logging.Filter):

@@ -14,9 +14,12 @@ from saq.queue import Queue
 from saq_k8s_watch import KubernetesSaqEventMonitor
 
 async def main() -> None:
-    queue = Queue.from_url("postgres://user:pass@host/db", name="default")
+    queues = [
+        Queue.from_url("postgres://user:pass@host/db", name=name)
+        for name in ("extraction", "orchestrator", "responsive")
+    ]
     monitor = KubernetesSaqEventMonitor(
-        queue,
+        queues,
         namespace="default",
         label_selector="app.kubernetes.io/name=saq-main",
         worker_id_label="saq.io/worker-id",
@@ -27,6 +30,25 @@ asyncio.run(main())
 ```
 
 If you don't set a worker-id label or annotation, the monitor falls back to using the pod name as the SAQ worker id.
+
+### Multi-Queue Support
+
+The monitor accepts a list of queues and scans all of them when looking for
+active jobs belonging to a stopped worker. The CLI reads queue names from
+`SAQ_QUEUE_NAMES` (comma-separated) with a fallback to `SAQ_QUEUE_NAME` for
+backward compatibility.
+
+### Orphan Sweep
+
+A periodic background sweep detects active jobs whose `worker_id` no longer
+matches any running pod. This catches jobs that slip through the event-based
+detection (e.g., monitor restart, missed events). Configure via:
+
+| Environment Variable | Default | Description |
+|---|---|---|
+| `SAQ_QUEUE_NAMES` | `default` | Comma-separated queue names to monitor |
+| `SAQ_ORPHAN_SWEEP_INTERVAL_S` | `60` | Seconds between sweep runs |
+| `SAQ_ORPHAN_SWEEP_MIN_AGE_S` | `300` | Minimum job age (seconds) before considering it orphaned |
 
 ## Tests
 

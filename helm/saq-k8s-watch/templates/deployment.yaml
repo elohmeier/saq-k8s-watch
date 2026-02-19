@@ -25,8 +25,8 @@ spec:
           env:
             - name: SAQ_QUEUE_URL
               value: {{ required "env.queueUrl is required" .Values.env.queueUrl | quote }}
-            - name: SAQ_QUEUE_NAME
-              value: {{ .Values.env.queueName | quote }}
+            - name: SAQ_QUEUE_NAMES
+              value: {{ .Values.env.queueNames | quote }}
             - name: SAQ_NAMESPACE
               value: {{ .Values.env.namespace | quote }}
             - name: SAQ_LABEL_SELECTOR
@@ -49,3 +49,7 @@ spec:
               value: {{ .Values.env.stopReasons | quote }}
             - name: SAQ_STOP_MESSAGE_SUBSTRINGS
               value: {{ .Values.env.stopMessageSubstrings | quote }}
+            - name: SAQ_ORPHAN_SWEEP_INTERVAL_S
+              value: {{ .Values.env.orphanSweepIntervalSeconds | quote }}
+            - name: SAQ_ORPHAN_SWEEP_MIN_AGE_S
+              value: {{ .Values.env.orphanSweepMinAgeSeconds | quote }}

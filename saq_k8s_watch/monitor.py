@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import importlib
 import inspect
 import logging
@@ -91,7 +92,7 @@ class EventDeduper:
 
 @dataclass(slots=True)
 class KubernetesSaqEventMonitor:
-    queue: Queue
+    queues: list[Queue]
     namespace: str | None = None
     label_selector: str | None = None
     worker_id_label: str | None = "saq.io/worker-id"
@@ -109,6 +110,8 @@ class KubernetesSaqEventMonitor:
     backoff_base_s: float = 1.0
     backoff_max_s: float = 30.0
     field_selector: str = "involvedObject.kind=Pod"
+    orphan_sweep_interval_s: float = 60.0
+    orphan_sweep_min_age_s: float = 300.0
 
     _api_client: K8sApiClient | None = field(default=None, init=False)
     _core_v1: K8sCoreV1Api | None = field(default=None, init=False)
@@ -119,27 +122,40 @@ class KubernetesSaqEventMonitor:
     _watched_pods_refreshed_at: float = field(default=0.0, init=False)
 
     async def run(self) -> None:
-        logger.info("Connecting to queue")
-        try:
-            await self.queue.connect()
-        except Exception:
-            logger.exception("Failed to connect to queue")
-            raise
-        logger.info("Connected to queue")
+        logger.info("Connecting to %d queue(s)", len(self.queues))
+        for queue in self.queues:
+            try:
+                await queue.connect()
+            except Exception:
+                logger.exception(
+                    "Failed to connect to queue %s", getattr(queue, "name", "?")
+                )
+                raise
+        logger.info("Connected to %d queue(s)", len(self.queues))
 
         await self._ensure_client()
 
-        backoff = self.backoff_base_s
-        while True:
-            try:
-                await self._watch_events()
-                backoff = self.backoff_base_s
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("Kubernetes events watch failed; retrying")
-                await asyncio.sleep(backoff)
-                backoff = min(self.backoff_max_s, backoff * 2)
+        sweep_task: asyncio.Task[None] | None = None
+        if self.orphan_sweep_interval_s > 0:
+            sweep_task = asyncio.create_task(self._orphan_sweep_loop())
+
+        try:
+            backoff = self.backoff_base_s
+            while True:
+                try:
+                    await self._watch_events()
+                    backoff = self.backoff_base_s
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    logger.exception("Kubernetes events watch failed; retrying")
+                    await asyncio.sleep(backoff)
+                    backoff = min(self.backoff_max_s, backoff * 2)
+        finally:
+            if sweep_task is not None:
+                sweep_task.cancel()
+                with _suppress_cancelled():
+                    await sweep_task
 
     async def close(self) -> None:
         if self._api_client is not None:
@@ -396,9 +412,10 @@ class KubernetesSaqEventMonitor:
 
     async def _jobs_for_worker(self, worker_id: str) -> list[Job]:
         jobs: list[Job] = []
-        async for job in self.queue.iter_jobs(list(self.job_statuses)):
-            if job.worker_id == worker_id:
-                jobs.append(job)
+        for queue in self.queues:
+            async for job in queue.iter_jobs(list(self.job_statuses)):
+                if job.worker_id == worker_id:
+                    jobs.append(job)
         return jobs
 
     async def _update_job_for_stop(self, job: Job, error: str) -> None:
@@ -408,14 +425,66 @@ class KubernetesSaqEventMonitor:
             await job.finish(self.terminal_status, error=error)
 
     async def _delete_worker_info(self, worker_id: str) -> None:
-        if RedisQueue is not None and isinstance(self.queue, RedisQueue):
-            key = self.queue.namespace(f"worker_info:{worker_id}")
-            async with self.queue.redis.pipeline(transaction=True) as pipe:
-                await pipe.delete(key).zrem(self.queue._stats, key).execute()
+        for queue in self.queues:
+            if RedisQueue is not None and isinstance(queue, RedisQueue):
+                key = queue.namespace(f"worker_info:{worker_id}")
+                async with queue.redis.pipeline(transaction=True) as pipe:
+                    await pipe.delete(key).zrem(queue._stats, key).execute()
+                continue
+
+            if PostgresQueue is not None and isinstance(queue, PostgresQueue):
+                await _delete_postgres_worker_info(queue, worker_id)
+
+    async def _orphan_sweep_loop(self) -> None:
+        """Periodically scan for active jobs whose workers no longer exist."""
+        while True:
+            await asyncio.sleep(self.orphan_sweep_interval_s)
+            try:
+                await self._orphan_sweep()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Orphan sweep failed")
+
+    async def _orphan_sweep(self) -> None:
+        await self._refresh_watched_pods()
+        if not self._watched_pods and self.label_selector:
+            logger.debug("Orphan sweep: no watched pods cached, skipping")
             return
 
-        if PostgresQueue is not None and isinstance(self.queue, PostgresQueue):
-            await _delete_postgres_worker_info(self.queue, worker_id)
+        now_ms = time.time() * 1000
+        min_age_ms = self.orphan_sweep_min_age_s * 1000
+        recovered = 0
+
+        for queue in self.queues:
+            async for job in queue.iter_jobs(list(self.job_statuses)):
+                worker_id = job.worker_id
+                if not worker_id:
+                    continue
+
+                # If the worker is in the watched pods set, it's still running
+                if self.label_selector and worker_id in self._watched_pods:
+                    continue
+                if not self.label_selector:
+                    # Without label_selector we can't determine running pods
+                    continue
+
+                # Grace period: skip jobs that started recently
+                started = getattr(job, "started", 0) or 0
+                if started > 0 and (now_ms - started) < min_age_ms:
+                    continue
+
+                error = (
+                    f"orphan sweep: worker {worker_id} not found in running pods"
+                    f" (queue={getattr(queue, 'name', '?')})"
+                )
+                await self._update_job_for_stop(job, error)
+                recovered += 1
+
+        if recovered:
+            logger.info("Orphan sweep recovered %d job(s)", recovered)
+        else:
+            logger.debug("Orphan sweep: no orphaned jobs found")
 
 
 async def _delete_postgres_worker_info(queue: Queue, worker_id: str) -> None:
@@ -433,6 +502,14 @@ async def _delete_postgres_worker_info(queue: Queue, worker_id: str) -> None:
             ),
             {"worker_id": worker_id},
         )
+
+
+@contextlib.contextmanager
+def _suppress_cancelled():
+    try:
+        yield
+    except asyncio.CancelledError:
+        pass
 
 
 async def _maybe_await(result: t.Any) -> None:

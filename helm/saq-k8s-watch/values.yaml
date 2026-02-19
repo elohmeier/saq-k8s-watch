@@ -14,7 +14,7 @@ rbac:
 
 env:
   queueUrl: ""
-  queueName: "default"
+  queueNames: "extraction,orchestrator,responsive"
   namespace: ""
   labelSelector: ""
   workerIdLabel: "saq.io/worker-id"
@@ -26,3 +26,5 @@ env:
   watchTimeoutSeconds: 300
   stopReasons: ""
   stopMessageSubstrings: ""
+  orphanSweepIntervalSeconds: 60
+  orphanSweepMinAgeSeconds: 300

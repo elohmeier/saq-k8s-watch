@@ -95,7 +95,7 @@ async def test_event_processed_when_pod_matches_label_selector() -> None:
     job = FakeJob(worker_id="saq-extraction-abc")
     queue = FakeQueue(jobs=[job])
     monitor = KubernetesSaqEventMonitor(
-        queue=queue,
+        queues=[queue],
         namespace="default",
         label_selector="app in (saq-extraction)",
         use_pod_name_as_worker_id=True,
@@ -120,7 +120,7 @@ async def test_event_skipped_when_pod_not_in_label_selector() -> None:
     job = FakeJob(worker_id="postgres-1")
     queue = FakeQueue(jobs=[job])
     monitor = KubernetesSaqEventMonitor(
-        queue=queue,
+        queues=[queue],
         namespace="default",
         label_selector="app in (saq-extraction)",
         use_pod_name_as_worker_id=True,
@@ -153,7 +153,7 @@ async def test_event_processed_when_no_label_selector() -> None:
     job = FakeJob(worker_id="any-pod")
     queue = FakeQueue(jobs=[job])
     monitor = KubernetesSaqEventMonitor(
-        queue=queue,
+        queues=[queue],
         namespace="default",
         label_selector=None,
         use_pod_name_as_worker_id=True,
@@ -175,7 +175,7 @@ async def test_cache_miss_triggers_refresh() -> None:
     job = FakeJob(worker_id="saq-extraction-new")
     queue = FakeQueue(jobs=[job])
     monitor = KubernetesSaqEventMonitor(
-        queue=queue,
+        queues=[queue],
         namespace="default",
         label_selector="app in (saq-extraction)",
         use_pod_name_as_worker_id=True,
@@ -212,7 +212,7 @@ async def test_refresh_rate_limited() -> None:
     """Full refresh is rate-limited; targeted checks fill the gap."""
     queue = FakeQueue(jobs=[])
     monitor = KubernetesSaqEventMonitor(
-        queue=queue,
+        queues=[queue],
         namespace="default",
         label_selector="app in (saq-extraction)",
         use_pod_name_as_worker_id=True,
@@ -248,7 +248,7 @@ async def test_targeted_check_discovers_new_pod() -> None:
     job = FakeJob(worker_id="saq-extraction-new")
     queue = FakeQueue(jobs=[job])
     monitor = KubernetesSaqEventMonitor(
-        queue=queue,
+        queues=[queue],
         namespace="default",
         label_selector="app in (saq-extraction)",
         use_pod_name_as_worker_id=True,
