@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.4.0 (2026-02-19)
+
+### Features
+
+- Multi-queue support and periodic orphan sweep
+  ([`5f8c69c`](https://github.com/elohmeier/saq-k8s-watch/commit/5f8c69c4c34a057ed19e0b5acda7f9490651bcf3))
+
+
 ## v1.3.0 (2026-02-16)
 
 ### Bug Fixes
