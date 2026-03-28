@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.4.2 (2026-03-28)
+
+### Bug Fixes
+
+- Resolve aiohttp 3.13 charset ValueError in metrics endpoint
+  ([`bed9c1d`](https://github.com/elohmeier/saq-k8s-watch/commit/bed9c1d6df6b1fc4b187235f11c40c09cd26e900))
+
+
 ## v1.4.1 (2026-02-19)
 
 ### Bug Fixes
