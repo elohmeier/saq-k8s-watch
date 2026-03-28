@@ -4,7 +4,6 @@ import logging
 
 from aiohttp import web
 from prometheus_client import (
-    CONTENT_TYPE_LATEST,
     CollectorRegistry,
     GCCollector,
     PlatformCollector,
@@ -28,7 +27,7 @@ async def _livez(_request: web.Request) -> web.Response:
 
 async def _metrics(_request: web.Request) -> web.Response:
     payload = generate_latest(REGISTRY)
-    return web.Response(body=payload, content_type=CONTENT_TYPE_LATEST)
+    return web.Response(body=payload, content_type="text/plain; version=1.0.0", charset="utf-8")
 
 
 async def start_server() -> web.AppRunner:
